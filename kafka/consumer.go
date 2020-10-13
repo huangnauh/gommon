@@ -10,7 +10,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-type KafkaConsumerConfig struct {
+type ConsumerConfig struct {
 	Debug            bool     `json:"debug" toml:"debug"`
 	Brokers          []string `json:"brokers" toml:"brokers"`
 	Group            string   `json:"group" toml:"group"`
@@ -31,8 +31,8 @@ type KafkaConsumerConfig struct {
 	Workers          int      `json:"workers" toml:"workers"`
 }
 
-func DefaultKafkaConsumerConfig() KafkaConsumerConfig {
-	return KafkaConsumerConfig{
+func DefaultConsumerConfig() ConsumerConfig {
+	return ConsumerConfig{
 		Brokers:          []string{"127.0.0.1:9092"},
 		Group:            "",
 		Topic:            "",
@@ -52,17 +52,17 @@ func DefaultKafkaConsumerConfig() KafkaConsumerConfig {
 	}
 }
 
-type KafkaConsumerHandler interface {
+type ConsumerHandler interface {
 	Handle(context context.Context, messages []*sarama.ConsumerMessage) error
 }
 
 type Consumer struct {
-	conf        *KafkaConsumerConfig
+	conf        *ConsumerConfig
 	ctx         context.Context
 	limiter     *rate.Limiter
 	consumed    int
 	consumedMsg string
-	handler     KafkaConsumerHandler
+	handler     ConsumerHandler
 	guard       chan struct{}
 }
 
@@ -130,7 +130,7 @@ func (c *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 	return nil
 }
 
-func newConsumerHandler(ctx context.Context, conf *KafkaConsumerConfig, handle KafkaConsumerHandler) *Consumer {
+func newConsumerHandler(ctx context.Context, conf *ConsumerConfig, handle ConsumerHandler) *Consumer {
 	c := &Consumer{conf: conf, ctx: ctx, handler: handle}
 	if conf.Batch <= 0 {
 		conf.Batch = 1
@@ -155,7 +155,7 @@ func newConsumerHandler(ctx context.Context, conf *KafkaConsumerConfig, handle K
 	return c
 }
 
-func newKafkaConsumerConfig(conf *KafkaConsumerConfig) *sarama.Config {
+func newConsumerConfig(conf *ConsumerConfig) *sarama.Config {
 	config := sarama.NewConfig()
 	config.Version = sarama.V2_5_0_0
 	config.ClientID = conf.Group
@@ -174,8 +174,8 @@ func newKafkaConsumerConfig(conf *KafkaConsumerConfig) *sarama.Config {
 	return config
 }
 
-func InitKafkaConsumer(ctx context.Context, conf *KafkaConsumerConfig, handle KafkaConsumerHandler) error {
-	config := newKafkaConsumerConfig(conf)
+func InitConsumer(ctx context.Context, conf *ConsumerConfig, handle ConsumerHandler) error {
+	config := newConsumerConfig(conf)
 	consumer := newConsumerHandler(ctx, conf, handle)
 	group, err := sarama.NewConsumerGroup(conf.Brokers, conf.Group, config)
 	if err != nil {

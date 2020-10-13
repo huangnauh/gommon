@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func NewHttpClient(connTimeout, respHeaderTimeout, timeout time.Duration) *http.Client {
+func NewClient(connTimeout, respHeaderTimeout, timeout time.Duration) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
@@ -22,5 +22,5 @@ func NewHttpClient(connTimeout, respHeaderTimeout, timeout time.Duration) *http.
 }
 
 var (
-	DefaultHttpClient = NewHttpClient(5*time.Second, 30*time.Second, 60*time.Second)
+	DefaultClient = NewClient(5*time.Second, 30*time.Second, 60*time.Second)
 )

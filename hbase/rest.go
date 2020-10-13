@@ -22,19 +22,19 @@ type Cell struct {
 	Value     string `json:"$"`
 }
 
-type HbaseRow struct {
+type Row struct {
 	Key   string `json:"key"`
 	Cells []Cell `json:"Cell"`
 }
 
-type HbaseRows struct {
-	Rows []HbaseRow `json:"Row"`
+type Rows struct {
+	Rows []Row `json:"Row"`
 }
 
 const (
-	defaultHbaseRestScanNum   = 10
-	defaultHbaseRestScanLimit = 1000
-	maxHbaseScanNum           = 10000
+	defaultRestScanNum   = 10
+	defaultRestScanLimit = 1000
+	maxScanNum           = 10000
 )
 
 func getPreviousKey(key string) string {
@@ -51,10 +51,10 @@ func getNextKey(key string) string {
 }
 
 func hbaseRestScan(addr, table, startRow, endRow string, limit int,
-	reversed bool) (*HbaseRows, error) {
+	reversed bool) (*Rows, error) {
 	if limit <= 0 {
-		limit = defaultHbaseRestScanNum
-	} else if limit > maxHbaseScanNum {
+		limit = defaultRestScanNum
+	} else if limit > maxScanNum {
 		return nil, fmt.Errorf("limit too large")
 	}
 
@@ -74,7 +74,7 @@ func hbaseRestScan(addr, table, startRow, endRow string, limit int,
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 
-	resp, err := hhttp.DefaultHttpClient.Do(request)
+	resp, err := hhttp.DefaultClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func hbaseRestScan(addr, table, startRow, endRow string, limit int,
 		return nil, err
 	}
 
-	v := &HbaseRows{}
+	v := &Rows{}
 	err = json.Unmarshal(data, v)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func hbaseRestScan(addr, table, startRow, endRow string, limit int,
 }
 
 func StartRestScanner(hbaseAddr, table, startRow, endRow string, limit,
-	timeout int, input chan<- HbaseRow) {
+	timeout int, input chan<- Row) {
 	defer close(input)
 	reversed := endRow != "" && strings.Compare(startRow, endRow) > 0
 	for {
@@ -109,7 +109,7 @@ func StartRestScanner(hbaseAddr, table, startRow, endRow string, limit,
 			return
 		}
 
-		scanLimit := defaultHbaseRestScanLimit
+		scanLimit := defaultRestScanLimit
 		if limit > 0 && limit < scanLimit {
 			scanLimit = limit
 		}
