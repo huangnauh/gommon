@@ -100,8 +100,8 @@ func hbaseRestScan(addr, table, startRow, endRow string, limit int,
 	return v, nil
 }
 
-func StartRestScanner(hbaseAddr, table, startRow, endRow string, limit,
-	timeout int, input chan<- Row) {
+func StartRestScanner(hbaseAddr, table, startRow, endRow string, limit int,
+	timeout time.Duration, input chan<- Row) {
 	defer close(input)
 	reversed := endRow != "" && strings.Compare(startRow, endRow) > 0
 	for {
@@ -116,7 +116,7 @@ func StartRestScanner(hbaseAddr, table, startRow, endRow string, limit,
 		scanRes, err := hbaseRestScan(hbaseAddr, table, startRow, endRow, scanLimit, reversed)
 		if err != nil {
 			logrus.Errorf("scan error, %s\n", err.Error())
-			time.Sleep(time.Duration(timeout) * time.Second)
+			time.Sleep(timeout)
 			continue
 		}
 
