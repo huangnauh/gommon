@@ -3,6 +3,7 @@ package hbase
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -37,6 +38,10 @@ const (
 	maxScanNum           = 10000
 )
 
+var (
+	NotFound = errors.New("not found")
+)
+
 func getPreviousKey(key string) string {
 	if key == "" {
 		return ""
@@ -48,6 +53,10 @@ func getPreviousKey(key string) string {
 
 func getNextKey(key string) string {
 	return key + "\x00"
+}
+
+func formatRestUrl(addr, table, key string) string {
+	return fmt.Sprintf("http://%s/%s/%s", addr, table, url.QueryEscape(key))
 }
 
 func hbaseRestScan(addr, table, startRow, endRow string, limit int,
@@ -95,9 +104,40 @@ func hbaseRestScan(addr, table, startRow, endRow string, limit int,
 	if err != nil {
 		return nil, err
 	}
-	logrus.Debugf("startrow %s, endrow %s, limit %d, reversed %t, found rows %d\n",
+	logrus.Infof("startrow %s, endrow %s, limit %d, reversed %t, found rows %d\n",
 		startRow, endRow, limit, reversed, len(v.Rows))
 	return v, nil
+}
+
+func HbaseRestGetRow(addr, table, row string) ([]byte, error) {
+	url := formatRestUrl(addr, table, row)
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "application/json")
+	resp, err := hhttp.DefaultClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		io.Copy(ioutil.Discard, resp.Body)
+		if resp.StatusCode == 404 {
+			return nil, NotFound
+		}
+		return nil, fmt.Errorf("get %d", resp.StatusCode)
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func StartRestScanner(hbaseAddr, table, startRow, endRow string, limit int,
@@ -121,14 +161,13 @@ func StartRestScanner(hbaseAddr, table, startRow, endRow string, limit int,
 		}
 
 		for _, v := range scanRes.Rows {
-			if limit == 0 {
-				break
-			}
-
 			if limit > 0 {
 				limit--
 			}
 			input <- v
+			if limit == 0 {
+				break
+			}
 		}
 
 		// no more rows.
