@@ -195,7 +195,6 @@ func InitConsumer(ctx context.Context, conf *ConsumerConfig, handle ConsumerHand
 		for {
 			if err := group.Consume(ctx, []string{conf.Topic}, consumer); err != nil {
 				logrus.Errorf("Error from consumer: %v", err)
-				return
 			}
 			if ctx.Err() != nil {
 				return
