@@ -13,6 +13,7 @@ import (
 type ConsumerConfig struct {
 	Debug            bool     `json:"debug" toml:"debug"`
 	Brokers          []string `json:"brokers" toml:"brokers"`
+	Version          string   `json:"version" toml:"version"`
 	Group            string   `json:"group" toml:"group"`
 	Topic            string   `json:"topic" toml:"topic"`
 	MinFetchSize     int32    `json:"min_fetch_bytes" toml:"min_fetch_bytes"`
@@ -155,9 +156,17 @@ func newConsumerHandler(ctx context.Context, conf *ConsumerConfig, handle Consum
 	return c
 }
 
-func newConsumerConfig(conf *ConsumerConfig) *sarama.Config {
+func newConsumerConfig(conf *ConsumerConfig) (*sarama.Config, error) {
 	config := sarama.NewConfig()
-	config.Version = sarama.V2_5_0_0
+	if conf.Version != "" {
+		parsedVersion, err := sarama.ParseKafkaVersion(conf.Version)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse Kafka version: %v\n", err)
+		}
+		config.Version = parsedVersion
+	} else {
+		config.Version = sarama.V2_5_0_0
+	}
 	config.ClientID = conf.Group
 	config.Consumer.Offsets.Initial = conf.InitOffset
 	//config.Consumer.Offsets.CommitInterval = time.Duration(conf.CommitInterval) * time.Second
@@ -171,11 +180,14 @@ func newConsumerConfig(conf *ConsumerConfig) *sarama.Config {
 	config.Consumer.Fetch.Default = conf.DefaultFetchSize
 	config.Consumer.MaxWaitTime = time.Duration(conf.FetchWaitTime) * time.Millisecond
 	//config.Group.Return.Notifications = true
-	return config
+	return config, nil
 }
 
 func InitConsumer(ctx context.Context, conf *ConsumerConfig, handle ConsumerHandler) error {
-	config := newConsumerConfig(conf)
+	config, err := newConsumerConfig(conf)
+	if err != nil {
+		return err
+	}
 	consumer := newConsumerHandler(ctx, conf, handle)
 	group, err := sarama.NewConsumerGroup(conf.Brokers, conf.Group, config)
 	if err != nil {
